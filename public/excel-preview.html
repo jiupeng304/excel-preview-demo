@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel 预览方案对比 (修复 Vue-Office 报错版)</title>
+    
+    <!-- 1. 必须最先加载 Vue 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script>
+        // 强制确保全局 Vue 对象可用，防止插件找不到 defineComponent
+        window.Vue = window.Vue || Vue;
+    </script>
+
+    <!-- 2. 基础工具库 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+    <!-- 3. vue-office (修正后的 V3 地址) -->
+    <!-- 注意：使用 1.6.0 或 1.7.x 稳定版本 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vue-office/excel@1.7.14/lib/v3/index.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@vue-office/excel@1.7.14/lib/v3/index.min.js"></script>
+
+    <!-- 4. x-data-spreadsheet -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.5/dist/xspreadsheet.css">
+    <script src="https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.5/dist/xspreadsheet.js"></script>
+
+    <!-- 5. Luckysheet -->
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/css/pluginsCss.css' />
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/plugins.css' />
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/luckysheet/dist/css/luckysheet.css' />
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/luckysheet/dist/assets/iconfont/iconfont.css' />
+    <script src="https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/js/plugin.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luckysheet/dist/luckysheet.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luckyexcel/dist/luckyexcel.umd.js"></script>
+
+    <style>
+        body { font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f7f9; }
+        .header { background: #fff; padding: 12px 20px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .nav { background: #fff; display: flex; padding: 0 20px; border-bottom: 1px solid #dcdfe6; }
+        .tab-btn { padding: 14px 20px; cursor: pointer; border: none; background: none; font-size: 14px; border-bottom: 3px solid transparent; transition: 0.2s; }
+        .tab-btn:hover { color: #409eff; }
+        .tab-btn.active { border-bottom-color: #409eff; color: #409eff; font-weight: bold; }
+        .container { flex: 1; position: relative; overflow: hidden; }
+        .pane { display: none; width: 100%; height: 100%; }
+        .pane.active { display: block; }
+        .btn-export { background: #67c23a; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        #table-box { overflow: auto; height: 100%; background: white; padding: 10px; }
+        #table-box table { border-collapse: collapse; width: 100%; }
+        #table-box td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="display:flex; align-items:center;">
+        <span style="font-weight:bold; margin-right:20px;">Excel 预览实验室</span>
+        <input type="file" id="upload-input" accept=".xlsx,.xls">
+    </div>
+    <div id="export-area" style="display:none;">
+        <button class="btn-export" onclick="handleExport()">💾 导出当前视图内容</button>
+    </div>
+</div>
+
+<div class="nav">
+    <div class="tab-btn active" onclick="switchTab('sheetjs')">SheetJS 表格</div>
+    <div class="tab-btn" onclick="switchTab('xs')">x-spreadsheet</div>
+    <div class="tab-btn" onclick="switchTab('vueoffice')">vue-office (V3)</div>
+    <div class="tab-btn" onclick="switchTab('lucky')">Luckysheet</div>
+</div>
+
+<div class="container">
+    <div id="pane-sheetjs" class="pane active"><div id="table-box">等待上传文件...</div></div>
+    <div id="pane-xs" class="pane"><div id="xs-box"></div></div>
+    <div id="pane-vueoffice" class="pane">
+        <div id="vue-app" style="height:100%;">
+            <!-- 使用正确加载后的组件 -->
+            <vue-office-excel v-if="excelSrc" :src="excelSrc" style="height:100%"></vue-office-excel>
+            <div v-else style="padding:40px; text-align:center; color:#999;">请先选择并上传 Excel 文件</div>
+        </div>
+    </div>
+    <div id="pane-lucky" class="pane"><div id="lucky-box" style="width:100%;height:100%;"></div></div>
+</div>
+
+<script>
+    let currentMode = 'sheetjs';
+    let currentFile = null;
+    let currentArrayBuffer = null;
+    let xsInstance = null;
+
+    // --- Vue 3 应用逻辑 ---
+    const { createApp, ref } = Vue;
+    const excelSrc = ref(null);
+    const app = createApp({
+        setup() { return { excelSrc }; }
+    });
+
+    // 修复报错的关键：检查全局变量 VueOfficeExcel
+    if (window.VueOfficeExcel) {
+        app.component('VueOfficeExcel', window.VueOfficeExcel);
+    } else {
+        console.error("vue-office 加载失败，请检查 CDN 地址");
+    }
+    app.mount('#vue-app');
+
+    // --- Tab 切换 ---
+    function switchTab(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+        document.getElementById(`pane-${mode}`).classList.add('active');
+        
+        if(mode === 'lucky') window.dispatchEvent(new Event('resize'));
+        // 控制导出按钮：vue-office 是纯预览，通常不在此处演示导出
+        document.getElementById('export-area').style.display = (mode === 'vueoffice') ? 'none' : 'block';
+    }
+
+    // --- 文件读取与分发 ---
+    document.getElementById('upload-input').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+
+        currentFile = file;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            currentArrayBuffer = ev.target.result;
+            excelSrc.value = currentArrayBuffer; // 更新 Vue 预览数据
+            
+            // 1. 初始化 SheetJS
+            const wb = XLSX.read(currentArrayBuffer, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            document.getElementById('table-box').innerHTML = XLSX.utils.sheet_to_html(ws);
+
+            // 2. 初始化 x-spreadsheet
+            const xsData = wb.SheetNames.map(name => ({
+                name, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1}).reduce((acc, row, i) => {
+                    acc[i] = { cells: row.reduce((c, val, j) => { c[j] = { text: val }; return c; }, {}) };
+                    return acc;
+                }, {})
+            }));
+            if(!xsInstance) xsInstance = x_spreadsheet("#xs-box", { showToolbar: true });
+            xsInstance.loadData(xsData);
+
+            // 3. 初始化 Luckysheet
+            LuckyExcel.transformExcelToLucky(file, (json) => {
+                luckysheet.destroy();
+                luckysheet.create({ container: 'lucky-box', data: json.sheets, lang: 'zh' });
+            });
+
+            document.getElementById('export-area').style.display = 'block';
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    // --- 导出功能 ---
+    async function handleExport() {
+        if(!currentArrayBuffer) return;
+
+        if(currentMode === 'sheetjs') {
+            const wb = XLSX.read(currentArrayBuffer, { type: 'array' });
+            XLSX.writeFile(wb, "export_sheetjs.xlsx");
+        } 
+        else if(currentMode === 'xs') {
+            const data = xsInstance.getData();
+            const newWb = XLSX.utils.book_new();
+            data.forEach(s => {
+                const aoa = [];
+                Object.keys(s.rows).forEach(r => {
+                    const row = [];
+                    Object.keys(s.rows[r].cells).forEach(c => { row[c] = s.rows[r].cells[c].text; });
+                    aoa[r] = row;
+                });
+                XLSX.utils.book_append_sheet(newWb, XLSX.utils.aoa_to_sheet(aoa), s.name);
+            });
+            XLSX.writeFile(newWb, "export_xspreadsheet.xlsx");
+        } 
+        else if(currentMode === 'lucky') {
+            const sheets = luckysheet.getAllSheets();
+            const workbook = new ExcelJS.Workbook();
+            sheets.forEach(s => {
+                const sheet = workbook.addWorksheet(s.name);
+                s.data.forEach((row, rIdx) => {
+                    row.forEach((cell, cIdx) => {
+                        if (cell && cell.v) sheet.getCell(rIdx + 1, cIdx + 1).value = cell.m || cell.v;
+                    });
+                });
+            });
+            const buffer = await workbook.xlsx.writeBuffer();
+            saveAs(new Blob([buffer]), "export_luckysheet.xlsx");
+        }
+    }
+</script>
+
+</body>
+</html>
