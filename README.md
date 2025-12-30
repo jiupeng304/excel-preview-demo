@@ -1,5 +1,60 @@
-# Vue 3 + TypeScript + Vite
+# Excel Preview Demo (Vue 3)
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+本项目演示了在 Vue 3 环境下预览 Excel 文件的三种常见方案。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 预览方案介绍
+
+### 1. @vue-office/excel
+
+- **原理**：基于 Canvas/DOM 也就是 vue-office 这个库封装的组件进行渲染。
+- **优点**：
+  - 使用简单，以 Vue 组件形式提供。
+  - 样式还原度尚可，适合做简单的文档预览。
+- **缺点**：
+  - 功能相对单一，主要用于展示，编辑能力较弱。
+  - 对某些复杂样式的还原可能不如专业 Sheet 库完美。
+
+### 2. SheetJS (xlsx) + 数据表格 (ElTable)
+
+- **原理**：使用 `xlsx` 库解析 Excel 文件二进制数据为 JSON 数据，然后使用前端 UI 组件库（如 Element Plus 的 ElTable）进行渲染。
+- **优点**：
+  - 极度灵活，完全自定义渲染 UI。
+  - 数据掌握在自己手中，易于进行清洗、过滤或二次处理。
+- **缺点**：
+  - 样式丢失，只保留数据。无法还原 Excel 的表格样式、合并单元格（需手动处理）、公式等视觉效果。
+  - 适合只关注数据的场景。
+
+### 3. Luckysheet / FortuneSheet
+
+- **原理**：加载 Luckysheet 及其依赖（如 `luckyexcel`），将 Excel 文件转换为 Luckysheet 的配置对象进行渲染。
+- **优点**：
+  - 界面和操作体验高度还原 Excel（类似 Google Sheets）。
+  - 支持公式、图表、筛选、透视表等强大功能。
+  - 支持在线编辑。
+- **缺点**：
+  - 体积较大大，通常需要引入多个 external 脚本。
+  - 渲染性能在极大数据量下可能会有压力。
+  - 移动端适配一般。
+
+## 方案对比
+
+| 特性         | @vue-office/excel | SheetJS + UI         | Luckysheet                   |
+| :----------- | :---------------- | :------------------- | :--------------------------- |
+| **还原度**   | 中等              | 低（仅数据）         | 高（像素级还原）             |
+| **交互性**   | 低（只读）        | 中（取决于 UI 组件） | 高（完整电子表格体验）       |
+| **集成难度** | 低                | 中（需手动处理数据） | 中（需处理 cdn 依赖）        |
+| **体积**     | 小                | 小（仅核心库）       | 大                           |
+| **适用场景** | 快速预览文档      | 数据导入预览/校验    | 在线 Excel 编辑/复杂报表预览 |
+
+## 静态演示页面
+
+本项目 `public/excel-preview.html` 提供了一个**纯静态 HTML 版本**的演示。
+该文件独立于 Vue 构建流程，直接通过 CDN 引入 Vue 3、SheetJS、vue-office、Luckysheet 等库，在一个单文件中展示了上述多种方案的用法。
+访问项目启动后的 `http://localhost:5173/excel-preview.html` 即可查看。
+
+## 运行项目
+
+```bash
+npm install
+npm run dev
+```
