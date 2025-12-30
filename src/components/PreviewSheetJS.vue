@@ -12,6 +12,7 @@
       </el-tab-pane>
     </el-tabs>
     <el-table
+      ref="tableRef"
       v-if="tableData.length"
       :data="tableData"
       border
@@ -63,7 +64,9 @@ const processFile = () => {
   }
 }
 
-const loadSheet = (sheetName: string) => {
+const tableRef = ref()
+
+const loadSheet = async (sheetName: string) => {
   if (!workbook.value || !sheetName) return
   const ws = workbook.value.Sheets[sheetName]
   if (!ws) return
@@ -79,6 +82,13 @@ const loadSheet = (sheetName: string) => {
       return obj
     })
     tableData.value = rows
+    
+    // Force layout update next tick
+    setTimeout(() => {
+      if (tableRef.value) {
+        tableRef.value.doLayout()
+      }
+    }, 0)
   } else {
     tableHeaders.value = []
     tableData.value = []

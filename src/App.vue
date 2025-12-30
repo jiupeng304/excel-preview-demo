@@ -61,9 +61,13 @@ const handleChange = (uploadFile: UploadFile) => {
     // Read as ArrayBuffer for VueOffice and SheetJS
     const reader = new FileReader()
     reader.onload = (e) => {
-      if (e.target?.result) {
-        fileArrayBuffer.value = e.target.result as ArrayBuffer
-      }
+      // Use nextTick to allow the UI to update (e.g. filename appearing) before rendering components
+      // This helps ensure correct height calculations
+      setTimeout(() => {
+        if (e.target?.result) {
+          fileArrayBuffer.value = e.target.result as ArrayBuffer
+        }
+      }, 100)
     }
     reader.readAsArrayBuffer(uploadFile.raw)
   }

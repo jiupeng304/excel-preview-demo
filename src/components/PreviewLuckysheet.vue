@@ -46,6 +46,19 @@ onMounted(() => {
     if(props.file) {
         initLuckysheet();
     }
+    
+    // Resize observer to handle container size changes
+    const container = document.querySelector('.luckysheet-preview');
+    if (container) {
+        const resizeObserver = new ResizeObserver(() => {
+             // @ts-ignore
+            if (window.luckysheet) {
+                 // @ts-ignore
+                window.luckysheet.resize();
+            }
+        });
+        resizeObserver.observe(container);
+    }
 })
 
 onBeforeUnmount(() => {
