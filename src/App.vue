@@ -20,7 +20,7 @@
       <div v-if="fileName" class="file-info">
         Current File: {{ fileName }}
       </div>
-      <a href="/excel-preview.html" target="_blank" style="margin-left: auto;">
+      <a href="./excel-preview.html" target="_blank" style="margin-left: auto;">
         <el-button type="success" plain>跳转静态演示页 (excel-preview.html)</el-button>
       </a>
     </div>
